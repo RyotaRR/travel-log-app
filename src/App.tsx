@@ -10,10 +10,10 @@ type Log = {
 };
 
 function App() {
+  const [session, setSession] = useState<any>(null);
   const [logs, setLogs] = useState<Log[]>([]);
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
-  const [session, setSession] = useState<any>(null);
 
   // ログイン状態を監視
   useEffect(() => {
@@ -26,14 +26,14 @@ function App() {
     });
   }, []);
 
-  // ログインしているユーザーのログだけ取得
+  // ログイン中のユーザーのログだけ取得
   useEffect(() => {
     if (!session) return;
 
     const fetchLogs = async () => {
       const uid = session.user.id;
 
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("logs")
         .select("*")
         .eq("user_id", uid)
@@ -47,12 +47,22 @@ function App() {
 
   // 追加
   const addLog = async () => {
+    console.log("session.user.id:", session.user.id);
     const uid = session.user.id;
+    console.log("uid:", uid);
 
     const { data, error } = await supabase
       .from("logs")
       .insert([{ title, date, user_id: uid }])
       .select();
+
+    console.log("insert error:", error);
+    console.log("insert data:", data);
+
+    if (error) {
+      alert("INSERT エラー: " + error.message);
+      return;
+    }
 
     if (data) setLogs([...logs, ...data]);
     setTitle("");
@@ -75,6 +85,9 @@ function App() {
   return (
     <div style={{ padding: "1rem" }}>
       <h1>旅ログアプリ</h1>
+
+      <p>ログイン中: {session.user.email}</p>
+
       <button onClick={signOut}>ログアウト</button>
 
       <div>

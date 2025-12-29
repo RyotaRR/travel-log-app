@@ -22,6 +22,13 @@ export default function Auth() {
     if (error) alert(error.message);
   };
 
+  const signInWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+    });
+    if (error) alert(error.message);
+  };
+
   return (
     <div>
       <h2>{mode === "login" ? "ログイン" : "新規登録"}</h2>
@@ -67,6 +74,9 @@ export default function Auth() {
           </p>
         </>
       )}
+
+      <hr />
+      <button onClick={signInWithGoogle}>Googleでログイン</button>
     </div>
   );
 }
