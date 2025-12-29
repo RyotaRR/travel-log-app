@@ -1,45 +1,59 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
+import Auth from "./components/Auth";
 
 type Log = {
   id: number;
   title: string;
   date: string;
+  user_id: string;
 };
 
 function App() {
   const [logs, setLogs] = useState<Log[]>([]);
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editDate, setEditDate] = useState("");
+  const [session, setSession] = useState<any>(null);
 
-  // 初回ロード時にデータ取得だお
+  // ログイン状態を監視
   useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+    });
+
+    supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+  }, []);
+
+  // ログインしているユーザーのログだけ取得
+  useEffect(() => {
+    if (!session) return;
+
     const fetchLogs = async () => {
+      const uid = session.user.id;
+
       const { data, error } = await supabase
         .from("logs")
         .select("*")
+        .eq("user_id", uid)
         .order("id");
-      if (error) console.error(error);
+
       if (data) setLogs(data);
     };
+
     fetchLogs();
-  }, []);
+  }, [session]);
 
   // 追加
   const addLog = async () => {
-    if (!title || !date) return;
+    const uid = session.user.id;
+
     const { data, error } = await supabase
       .from("logs")
-      .insert([{ title, date }])
+      .insert([{ title, date, user_id: uid }])
       .select();
-    if (error) {
-      console.error("Insert error:", error.message);
-      alert("追加に失敗しました: " + error.message);
-      return;
-    }
+
     if (data) setLogs([...logs, ...data]);
     setTitle("");
     setDate("");
@@ -47,46 +61,23 @@ function App() {
 
   // 削除
   const deleteLog = async (id: number) => {
-    const { error } = await supabase.from("logs").delete().eq("id", id);
-    if (error) {
-      console.error(error);
-      return;
-    }
+    await supabase.from("logs").delete().eq("id", id);
     setLogs(logs.filter((log) => log.id !== id));
   };
 
-  // 編集開始
-  const startEdit = (log: Log) => {
-    setEditingId(log.id);
-    setEditTitle(log.title);
-    setEditDate(log.date);
+  // ログアウト
+  const signOut = async () => {
+    await supabase.auth.signOut();
   };
 
-  // 編集保存
-  const saveEdit = async (id: number) => {
-    const { error } = await supabase
-      .from("logs")
-      .update({ title: editTitle, date: editDate })
-      .eq("id", id);
-    if (error) {
-      console.error(error);
-      return;
-    }
-    setLogs(
-      logs.map((log) =>
-        log.id === id ? { ...log, title: editTitle, date: editDate } : log
-      )
-    );
-    setEditingId(null);
-    setEditTitle("");
-    setEditDate("");
-  };
+  if (!session) return <Auth />;
 
   return (
     <div style={{ padding: "1rem" }}>
       <h1>旅ログアプリ</h1>
+      <button onClick={signOut}>ログアウト</button>
 
-      <div style={{ marginBottom: "1rem" }}>
+      <div>
         <input
           type="text"
           placeholder="タイトル"
@@ -104,27 +95,8 @@ function App() {
       <ul>
         {logs.map((log) => (
           <li key={log.id}>
-            {editingId === log.id ? (
-              <>
-                <input
-                  type="text"
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                />
-                <input
-                  type="date"
-                  value={editDate}
-                  onChange={(e) => setEditDate(e.target.value)}
-                />
-                <button onClick={() => saveEdit(log.id)}>保存</button>
-              </>
-            ) : (
-              <>
-                <strong>{log.title}</strong> - {log.date}
-                <button onClick={() => startEdit(log)}>編集</button>
-                <button onClick={() => deleteLog(log.id)}>削除</button>
-              </>
-            )}
+            {log.title} - {log.date}
+            <button onClick={() => deleteLog(log.id)}>削除</button>
           </li>
         ))}
       </ul>
