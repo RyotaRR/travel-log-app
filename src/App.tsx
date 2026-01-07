@@ -2,18 +2,19 @@ import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
 import Auth from "./components/Auth";
 import DeleteModal from "./components/DeleteModal";
+import ProfileRegister from "./components/ProfileRegister"; // ← 追加
 
 export default function App() {
   const [session, setSession] = useState(null);
+  const [showRegisterForm, setShowRegisterForm] = useState(false); // ← 追加
+
   const [logs, setLogs] = useState([]);
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
 
-  // モーダル用
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [targetId, setTargetId] = useState<string | null>(null);
 
-  // セッション取得
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
@@ -28,7 +29,6 @@ export default function App() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  // ログ取得
   useEffect(() => {
     if (!session) return;
 
@@ -50,7 +50,6 @@ export default function App() {
     fetchLogs();
   }, [session]);
 
-  // ログ追加
   const addLog = async () => {
     const uid = session.user.id;
 
@@ -69,13 +68,11 @@ export default function App() {
     setDate("");
   };
 
-  // 削除ボタン押したとき
   const confirmDelete = (id: string) => {
     setTargetId(id);
     setShowDeleteModal(true);
   };
 
-  // 実際に削除
   const deleteLog = async () => {
     if (!targetId) return;
 
@@ -91,12 +88,17 @@ export default function App() {
     setTargetId(null);
   };
 
-  // ログインしていない時は Auth 画面
-  if (!session) return <Auth />;
+  // 🔥 ここが重要：ログインしていない場合の画面切り替え
+  if (!session) {
+    if (showRegisterForm) {
+      return <ProfileRegister onComplete={() => setShowRegisterForm(false)} />;
+    }
+
+    return <Auth onStartRegister={() => setShowRegisterForm(true)} />;
+  }
 
   return (
     <div style={{ padding: "20px" }}>
-      {/* ログアウトボタン */}
       <button
         onClick={async () => {
           await supabase.auth.signOut();
@@ -113,7 +115,6 @@ export default function App() {
 
       <h2>旅ログ</h2>
 
-      {/* 追加フォーム */}
       <div>
         <input
           type="text"
@@ -129,7 +130,6 @@ export default function App() {
         <button onClick={addLog}>追加</button>
       </div>
 
-      {/* ログ一覧 */}
       <ul>
         {logs.map((log) => (
           <li key={log.id} style={{ marginTop: "10px" }}>
@@ -144,7 +144,6 @@ export default function App() {
         ))}
       </ul>
 
-      {/* 削除確認モーダル */}
       {showDeleteModal && (
         <DeleteModal
           onConfirm={deleteLog}
