@@ -13,7 +13,24 @@ export default function App() {
   const [date, setDate] = useState("");
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [targetId, setTargetId] = useState<string | null>(null);
+  const [targetId, setTargetId] = useState<number | null>(null);
+
+  const fetchLogs = async () => {
+    if (!session) return;
+
+    const { data, error } = await supabase
+      .from("logs")
+      .select("*")
+      .eq("user_id", session.user.id)
+      .order("date", { ascending: false });
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    setLogs(data || []);
+  };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -23,7 +40,7 @@ export default function App() {
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setSession(session);
-      }
+      },
     );
 
     return () => listener.subscription.unsubscribe();
@@ -31,40 +48,16 @@ export default function App() {
 
   useEffect(() => {
     if (!session) return;
-
-    const fetchLogs = async () => {
-      const { data, error } = await supabase
-        .from("logs")
-        .select("*")
-        .eq("user_id", session.user.id)
-        .order("date", { ascending: false });
-
-      if (error) {
-        console.error(error);
-        return;
-      }
-
-      setLogs(data || []);
-    };
-
     fetchLogs();
   }, [session]);
-  // ③ 天気取得関数 ← ★ここに書くのがベスト
-  const fetchWeather = async (city) => {
-    const apiKey = "YOUR_API_KEY";
-    const res = await fetch(
-      `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&lang=ja&units=metric`
-    );
-    return await res.json();
-  };
 
   const addLog = async () => {
     const uid = session.user.id;
-
-    // 天気取得
-    const weatherData = await fetchWeather("Osaka");
-    const weather = weatherData.weather[0].description;
-    const temp = weatherData.main.temp;
+    // デバッグ用ログ
+    console.log("addLog called");
+    console.log("title:", title);
+    console.log("date:", date);
+    console.log("session:", session);
 
     // Supabase に保存
     const { data, error } = await supabase
@@ -74,8 +67,6 @@ export default function App() {
           title,
           date,
           user_id: uid,
-          weather,
-          temp,
         },
       ])
       .select();
@@ -95,7 +86,7 @@ export default function App() {
     setDate("");
   };
 
-  const confirmDelete = (id: string) => {
+  const confirmDelete = (id: number) => {
     setTargetId(id);
     setShowDeleteModal(true);
   };
@@ -113,6 +104,41 @@ export default function App() {
     setLogs(logs.filter((log) => log.id !== targetId));
     setShowDeleteModal(false);
     setTargetId(null);
+  };
+  // 画像アップロード処理
+  const handleFileChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    logId: number,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const filePath = `${session?.user.id}/${Date.now()}-${file.name}`;
+
+    // Storage にアップロード
+    const { error } = await supabase.storage
+      .from("log-images")
+      .upload(filePath, file);
+
+    if (error) {
+      console.error("Upload error:", error);
+      return;
+    }
+
+    // 公開URLを取得
+    const { data: urlData } = supabase.storage
+      .from("log-images")
+      .getPublicUrl(filePath);
+
+    const imageUrl = urlData.publicUrl;
+
+    // logs テーブルに保存
+    await supabase.from("logs").update({ image_url: imageUrl }).eq("id", logId);
+    // 画像反映のためにリロード
+    window.location.reload();
+
+    // UI 更新
+    await fetchLogs();
   };
 
   // 🔥 ここが重要：ログインしていない場合の画面切り替え
@@ -159,14 +185,27 @@ export default function App() {
 
       <ul>
         {logs.map((log) => (
-          <li key={log.id} style={{ marginTop: "10px" }}>
-            {log.date} - {log.title}
-            <button
-              style={{ marginLeft: "10px", color: "red" }}
-              onClick={() => confirmDelete(log.id)}
-            >
-              削除
-            </button>
+          <li key={log.id}>
+            <p>{log.title}</p>
+            <p>{log.date}</p>
+
+            {/* 画像があれば表示 */}
+            {log.image_url && (
+              <img
+                src={`${log.image_url}?t=${Date.now()}`}
+                alt="log image"
+                style={{ width: "200px", borderRadius: "8px" }}
+              />
+            )}
+
+            {/* 画像アップロード */}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => handleFileChange(e, log.id)}
+            />
+
+            <button onClick={() => confirmDelete(log.id)}>削除</button>
           </li>
         ))}
       </ul>
