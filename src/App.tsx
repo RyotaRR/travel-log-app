@@ -49,21 +49,48 @@ export default function App() {
 
     fetchLogs();
   }, [session]);
+  // ③ 天気取得関数 ← ★ここに書くのがベスト
+  const fetchWeather = async (city) => {
+    const apiKey = "YOUR_API_KEY";
+    const res = await fetch(
+      `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&lang=ja&units=metric`
+    );
+    return await res.json();
+  };
 
   const addLog = async () => {
     const uid = session.user.id;
 
+    // 天気取得
+    const weatherData = await fetchWeather("Osaka");
+    const weather = weatherData.weather[0].description;
+    const temp = weatherData.main.temp;
+
+    // Supabase に保存
     const { data, error } = await supabase
       .from("logs")
-      .insert([{ title, date, user_id: uid }])
+      .insert([
+        {
+          title,
+          date,
+          user_id: uid,
+          weather,
+          temp,
+        },
+      ])
       .select();
 
+    // ★ エラー確認（必須）
     if (error) {
-      alert("INSERT エラー: " + error.message);
+      console.error("INSERT ERROR:", error);
+      alert("エラーが発生しました: " + error.message);
       return;
     }
 
+    // ローカル state に反映
     if (data) setLogs([...logs, ...data]);
+
+    // 入力欄クリア
     setTitle("");
     setDate("");
   };
