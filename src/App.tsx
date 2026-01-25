@@ -2,13 +2,24 @@ import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
 import Auth from "./components/Auth";
 import DeleteModal from "./components/DeleteModal";
-import ProfileRegister from "./components/ProfileRegister"; // ← 追加
+import ProfileRegister from "./components/ProfileRegister";
+import type { Session } from "@supabase/supabase-js"; //vercel対応
+
+// ログの型定義
+type TravelLog = {
+  id: number;
+  title: string;
+  date: string;
+  image_url?: string;
+  user_id: string;
+};
 
 export default function App() {
-  const [session, setSession] = useState(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [showRegisterForm, setShowRegisterForm] = useState(false); // ← 追加
 
-  const [logs, setLogs] = useState([]);
+  const [logs, setLogs] = useState<TravelLog[]>([]);
+
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
 
@@ -21,7 +32,7 @@ export default function App() {
     const { data, error } = await supabase
       .from("logs")
       .select("*")
-      .eq("user_id", session.user.id)
+      .eq("user_id", session!.user.id)
       .order("date", { ascending: false });
 
     if (error) {
@@ -52,7 +63,8 @@ export default function App() {
   }, [session]);
 
   const addLog = async () => {
-    const uid = session.user.id;
+    const uid = session?.user.id;
+    if (!uid) return;
     // デバッグ用ログ
     console.log("addLog called");
     console.log("title:", title);
@@ -111,9 +123,9 @@ export default function App() {
     logId: number,
   ) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !session) return;
 
-    const filePath = `${session?.user.id}/${Date.now()}-${file.name}`;
+    const filePath = `${session.user.id}/${Date.now()}-${file.name}`;
 
     // Storage にアップロード
     const { error } = await supabase.storage
