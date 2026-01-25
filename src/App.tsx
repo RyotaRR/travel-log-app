@@ -137,7 +137,7 @@ export default function App() {
     // 画像反映のためにリロード
     window.location.reload();
 
-    // UI 更新
+    // UIを更新
     await fetchLogs();
   };
 
