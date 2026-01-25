@@ -1,5 +1,3 @@
-import React from "react";
-
 type Props = {
   onConfirm: () => void;
   onCancel: () => void;

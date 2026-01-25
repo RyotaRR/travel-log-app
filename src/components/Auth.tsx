@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { supabase } from "../supabaseClient";
-export default function Auth({ onStartRegister }) {
+type AuthProps = {
+  onStartRegister: () => void;
+};
+export default function Auth({ onStartRegister }: AuthProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
